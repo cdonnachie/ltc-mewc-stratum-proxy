@@ -28,6 +28,9 @@ zmqpubrawblock=tcp://0.0.0.0:${MEWC_ZMQ_RAW_PORT:-28434}
 # Additional settings for better operation
 maxconnections=50
 timeout=30000
+
+# Pruning configuration (0 = disabled/full node, >550 = prune to specified MB)
+prune=${MEWC_PRUNE:-0}
 EOF
 
 # Fix ownership of the config file

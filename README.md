@@ -738,7 +738,7 @@ If you encounter RPC authentication errors:
 
 ### Wallet Setup
 
-**Important**: Before generating addresses, you must first create and load wallets for both nodes.
+**Important**: Before generating addresses for Litecoin, you must first create and load a wallet. Meowcoin uses the traditional single wallet.dat file that is automatically created.
 
 1. **Create Litecoin Wallet**:
 
@@ -750,29 +750,20 @@ If you encounter RPC authentication errors:
    docker compose exec -it litecoin litecoin-cli -datadir="/home/litecoin/.litecoin" loadwallet "default" true
    ```
 
-2. **Create Meowcoin Wallet** (optional, for dual-chain mining):
-
-   ```bash
-   # Create a new wallet named "default"
-   docker compose exec -it meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" createwallet "default"
-
-   # Load the wallet and set it to load on startup
-   docker compose exec -it meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" loadwallet "default" true
-   ```
-
-3. **Generate Litecoin Address**:
+2. **Generate Litecoin Address**:
 
    ```bash
    docker compose exec -it litecoin litecoin-cli -datadir="/home/litecoin/.litecoin" getnewaddress
    ```
 
-4. **Generate Meowcoin Address** (optional, for dual-chain mining):
+3. **Generate Meowcoin Address** (optional, for dual-chain mining):
 
    ```bash
+   # Meowcoin uses traditional wallet.dat (auto-created on first run)
    docker compose exec -it meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" getnewaddress
    ```
 
-5. **Update .env file** with your addresses (optional - leave `MEWC_WALLET_ADDRESS` blank for Litecoin-only mining)
+4. **Update .env file** with your addresses (optional - leave `MEWC_WALLET_ADDRESS` blank for Litecoin-only mining)
 
 ### CLI Testing
 
