@@ -21,6 +21,23 @@ if exist "binaries\litecoin\litecoin-cli" (
 )
 
 echo.
+echo [*] Checking Dogecoin binaries...
+
+if exist "binaries\dogecoin\dogecoind" (
+    echo [OK] Dogecoin Daemon: Found
+) else (
+    echo [!!] Dogecoin Daemon: Missing
+    echo     Expected: binaries\dogecoin\dogecoind
+)
+
+if exist "binaries\dogecoin\dogecoin-cli" (
+    echo [OK] Dogecoin CLI: Found
+) else (
+    echo [!!] Dogecoin CLI: Missing
+    echo     Expected: binaries\dogecoin\dogecoin-cli
+)
+
+echo.
 echo [*] Checking Meowcoin binaries...
 
 if exist "binaries\meowcoin\meowcoind" (
@@ -49,6 +66,15 @@ if exist "binaries\litecoin" (
     echo ^|   +-- ^(directory missing^)
 )
 
+echo +-- dogecoin\
+if exist "binaries\dogecoin" (
+    for %%f in (binaries\dogecoin\*) do (
+        echo ^|   +-- %%~nxf
+    )
+) else (
+    echo ^|   +-- ^(directory missing^)
+)
+
 echo +-- meowcoin\
 if exist "binaries\meowcoin" (
     for %%f in (binaries\meowcoin\*) do (
@@ -64,6 +90,8 @@ REM Count missing binaries
 set missing=0
 if not exist "binaries\litecoin\litecoind" set /a missing+=1
 if not exist "binaries\litecoin\litecoin-cli" set /a missing+=1
+if not exist "binaries\dogecoin\dogecoind" set /a missing+=1
+if not exist "binaries\dogecoin\dogecoin-cli" set /a missing+=1
 if not exist "binaries\meowcoin\meowcoind" set /a missing+=1
 if not exist "binaries\meowcoin\meowcoin-cli" set /a missing+=1
 
@@ -87,6 +115,7 @@ echo.
 echo [HELP] Documentation:
 echo   Binary requirements: See binaries\README.md
 echo   Litecoin setup: See binaries\litecoin\README.md
+echo   Dogecoin setup: See binaries\dogecoin\README.md
 echo   Meowcoin setup: See binaries\meowcoin\README.md
 
 pause

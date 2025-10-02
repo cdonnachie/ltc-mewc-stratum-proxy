@@ -34,6 +34,7 @@ class StratumSession(RPCSession):
         verbose: bool,
         node_url: str,
         aux_url: str | None,
+        doge_url: str | None,
         debug_shares: bool,
         share_difficulty_divisor: float,
         transport,
@@ -51,6 +52,7 @@ class StratumSession(RPCSession):
         self._transport = transport
         self._node_url = node_url
         self._aux_url = aux_url
+        self._doge_url = doge_url
         self._extranonce1 = None
         self.logger = logging.getLogger("Stratum-Proxy")
         self._keepalive_task = None  # Keepalive task reference
@@ -287,14 +289,20 @@ class StratumSession(RPCSession):
             mewc_target_int = int(state.aux_job.target, 16)
             is_mewc_block = hnum <= mewc_target_int
 
+        # Check DOGE target (if available)
+        is_doge_block = False
+        if state.doge_job and state.doge_job.target:
+            doge_target_int = int(state.doge_job.target, 16)
+            is_doge_block = hnum <= doge_target_int
+
         sent_diff = getattr(self, "_share_difficulty", 1.0) or 1.0
         DIFF1 = int(
             "00000000ffff0000000000000000000000000000000000000000000000000000", 16
         )
         share_diff = DIFF1 / max(1, hnum)
 
-        # Accept share if it meets either target or the miner difficulty
-        is_block = is_ltc_block or is_mewc_block
+        # Accept share if it meets any target or the miner difficulty
+        is_block = is_ltc_block or is_mewc_block or is_doge_block
         if not is_block and (share_diff / sent_diff) < 0.99:
             if self._debug_shares:
                 self.logger.error(
@@ -307,6 +315,8 @@ class StratumSession(RPCSession):
         block_msg_parts = []
         if is_ltc_block:
             block_msg_parts.append("LTC BLOCK!")
+        if is_doge_block:
+            block_msg_parts.append("DOGE BLOCK!")
         if is_mewc_block:
             block_msg_parts.append("MEWC BLOCK!")
         block_msg = f" ({', '.join(block_msg_parts)})" if block_msg_parts else ""
@@ -314,6 +324,11 @@ class StratumSession(RPCSession):
         if self._verbose or is_block:
             # Convert targets to difficulty values for better readability
             ltc_difficulty = target_to_diff1(ltc_target_int)
+            doge_difficulty = (
+                target_to_diff1(doge_target_int)
+                if state.doge_job and state.doge_job.target
+                else 0.0
+            )
             mewc_difficulty = (
                 target_to_diff1(mewc_target_int)
                 if state.aux_job and state.aux_job.target
@@ -321,25 +336,28 @@ class StratumSession(RPCSession):
             )
 
             self.logger.info(
-                "Share accepted by %s - shareDiff=%.6f%s LTC diff: %.6f MEWC diff: %.6f",
+                "Share accepted by %s - shareDiff=%.6f%s LTC diff: %.6f DOGE diff: %.6f MEWC diff: %.6f",
                 worker,
                 share_diff,
                 block_msg,
                 ltc_difficulty,
+                doge_difficulty,
                 mewc_difficulty,
             )
 
         # Submit to appropriate blockchain(s)
-        if is_ltc_block or is_mewc_block:
+        if is_ltc_block or is_doge_block or is_mewc_block:
             import time
 
             # Show which hash meets which target
-            if state.aux_job:
+            if state.doge_job or state.aux_job:
                 ltc_meets = "✓" if is_ltc_block else "✗"
+                doge_meets = "✓" if is_doge_block else "✗"
                 mewc_meets = "✓" if is_mewc_block else "✗"
                 self.logger.info(
-                    "Block qualification - LTC: %s, MEWC: %s",
+                    "Block qualification - LTC: %s, DOGE: %s, MEWC: %s",
                     ltc_meets,
+                    doge_meets,
                     mewc_meets,
                 )
 
@@ -450,13 +468,22 @@ class StratumSession(RPCSession):
                         )
 
                         # Build branch proof (merkle branch in aux chain tree)
-                        branch_proof = ser_varint(
-                            0
-                        ) + (  # Number of aux chain branches (0)
-                            0
-                        ).to_bytes(
-                            4, "little"
-                        )  # Aux chain index (0)
+                        # Get the position and branch for MEWC from the MM tree
+                        chain_positions = getattr(state, "aux_chain_positions", {})
+                        if "MEWC" in chain_positions:
+                            chain_index, chain_branch = chain_positions["MEWC"]
+                            branch_proof = (
+                                ser_varint(
+                                    len(chain_branch)
+                                )  # Number of aux chain branches
+                                + b"".join(chain_branch)  # Branch hashes
+                                + chain_index.to_bytes(
+                                    4, "little"
+                                )  # Chain index in MM tree
+                            )
+                        else:
+                            # Fallback for single chain (no tree)
+                            branch_proof = ser_varint(0) + (0).to_bytes(4, "little")
 
                         auxpow_data = (
                             coinbase_nowit_full  # Parent coinbase tx
@@ -596,6 +623,197 @@ class StratumSession(RPCSession):
                                 )
                     except Exception as e:
                         self.logger.error("MEWC submit failed: %s", e)
+
+                # Submit to DOGE if it meets DOGE target and doge is configured
+                if is_doge_block and self._doge_url and state.doge_job:
+                    try:
+                        from ..consensus.auxpow import AuxJob
+
+                        # Minimal auxpow blob (coinbase proof, no aux-branch for single leaf)
+                        def ser_varint(n: int):
+                            if n < 0xFD:
+                                return n.to_bytes(1, "little")
+                            if n <= 0xFFFF:
+                                return b"\xfd" + n.to_bytes(2, "little")
+                            if n <= 0xFFFFFFFF:
+                                return b"\xfe" + n.to_bytes(4, "little")
+                            return b"\xff" + n.to_bytes(8, "little")
+
+                        # IMPORTANT: Use snapshots to ensure consistency
+                        coinbase_nowit_full = (
+                            coinbase1_nowit_snapshot
+                            + en1
+                            + en2
+                            + coinbase2_nowit_snapshot
+                        )
+
+                        # Build coinbase proof (merkle branch from coinbase to block merkle root)
+                        coinbase_proof = (
+                            ser_varint(
+                                len(state.coinbase_branch)
+                            )  # Number of merkle steps
+                            + b"".join(state.coinbase_branch)  # Merkle branch hashes
+                            + state.coinbase_index.to_bytes(
+                                4, "little"
+                            )  # Coinbase index in block
+                        )
+
+                        # Build branch proof (merkle branch in aux chain tree)
+                        # Get the position and branch for DOGE from the MM tree
+                        chain_positions = getattr(state, "aux_chain_positions", {})
+                        if "DOGE" in chain_positions:
+                            chain_index, chain_branch = chain_positions["DOGE"]
+                            branch_proof = (
+                                ser_varint(
+                                    len(chain_branch)
+                                )  # Number of aux chain branches
+                                + b"".join(chain_branch)  # Branch hashes
+                                + chain_index.to_bytes(
+                                    4, "little"
+                                )  # Chain index in MM tree
+                            )
+                        else:
+                            # Fallback for single chain (no tree)
+                            branch_proof = ser_varint(0) + (0).to_bytes(4, "little")
+
+                        auxpow_data = (
+                            coinbase_nowit_full  # Parent coinbase tx
+                            + parent_block_hash_for_auxpow  # Parent block hash (from Litecoin block being submitted)
+                            + coinbase_proof  # Coinbase merkle proof
+                            + branch_proof  # Aux chain merkle proof
+                            + header80  # Parent block header (80 bytes)
+                        )
+                        auxpow_hex = auxpow_data.hex()
+                        from ..rpc.doge import submitauxblock
+
+                        # Check if doge job is recent enough
+                        import time
+
+                        current_time = int(time.time())
+                        doge_age = current_time - getattr(state, "doge_last_update", 0)
+
+                        state.logger.info("Submitting to DOGE")
+
+                        # Warn if doge job might be stale
+                        if doge_age > 60:  # More than 1 minute old
+                            state.logger.warning(
+                                "DOGE aux job is %d seconds old, may be stale", doge_age
+                            )
+
+                        js = await submitauxblock(
+                            http, self._doge_url, state.doge_job.aux_hash, auxpow_hex
+                        )
+
+                        # Log DOGE submission history to file with detailed auxpow information
+                        if not os.path.exists("./submit_history"):
+                            os.mkdir("./submit_history")
+
+                        # Use DOGE height from doge job if available, otherwise fall back to LTC height
+                        doge_height = getattr(state.doge_job, "height", state.height)
+
+                        with open(
+                            f"./submit_history/DOGE_{doge_height}_{state.job_counter}.txt",
+                            "w",
+                        ) as f:
+                            dump = f"=== DOGE AUXPOW SUBMISSION ===\n"
+                            dump += f"Submission Time: {submit_time}\n"
+                            dump += f"Worker: {worker}\n"
+                            dump += f"Job ID: {job_id}\n"
+                            dump += f"LTC Block Height: {state.height}\n"
+                            dump += f"LTC Block Hash (dsha256): {parent_block_hash_for_auxpow.hex()}\n"
+                            dump += f"DOGE Block Height: {doge_height}\n"
+                            dump += f"DOGE Aux Hash: {state.doge_job.aux_hash}\n"
+                            dump += f'DOGE Chain ID: {getattr(state.doge_job, "chain_id", "unknown")}\n'
+                            dump += f"Extranonce1: {self._extranonce1}\n"
+                            dump += f"Extranonce2: {extranonce2_hex}\n"
+                            dump += f"Ntime: {ntime_hex}\n"
+                            dump += f"Nonce: {nonce_hex}\n"
+                            dump += f"Scrypt Hash: {scrypt_digest_le.hex()}\n"
+                            dump += f"Hash Number: {hnum}\n"
+                            dump += f'DOGE Target: {state.doge_job.target if state.doge_job.target else "unknown"}\n'
+                            dump += f"Meets DOGE Target: {is_doge_block}\n"
+                            dump += f"Share Difficulty: {share_diff:.18f}\n"
+                            dump += f"Parent Header: {header80.hex()}\n"
+                            dump += f"Parent Block Hash (for AuxPoW): {parent_block_hash_for_auxpow.hex()}\n"
+                            dump += f"Coinbase Branch Length: {len(state.coinbase_branch)}\n"
+                            dump += f"AuxPoW Hex Length: {len(auxpow_hex)} chars\n\n"
+                            dump += f"RPC Response:\n{json.dumps(js, indent=2)}\n\n"
+                            dump += f"Full State:\n{state.__repr__()}\n\n"
+                            dump += f"AuxPoW Hex:\n{auxpow_hex}\n\n"
+                            dump += (
+                                f"Non-Witness Coinbase:\n{coinbase_nowit_full.hex()}"
+                            )
+                            f.write(dump)
+
+                        if js.get("error"):
+                            error_code = js["error"].get("code", 0)
+                            error_msg = js["error"].get("message", "unknown")
+
+                            if error_code == -8:  # Block hash unknown
+                                self.logger.warning(
+                                    "DOGE submitauxblock: aux hash expired (age: %ds, hash: %s) - refreshing for next share",
+                                    doge_age,
+                                    state.doge_job.aux_hash,
+                                )
+                                # Immediately refresh doge job to get a fresh hash
+                                from ..consensus.auxpow import refresh_doge_job
+                                from ..config import Settings
+
+                                try:
+                                    settings = Settings()
+                                    await refresh_doge_job(
+                                        state,
+                                        http,
+                                        self._doge_url,
+                                        settings.doge_address,
+                                        force_update=True,
+                                    )
+                                    self.logger.info(
+                                        "DOGE aux job refreshed after stale submission"
+                                    )
+                                except Exception as refresh_error:
+                                    self.logger.error(
+                                        "Failed to refresh DOGE aux job: %s",
+                                        refresh_error,
+                                    )
+                            else:
+                                self.logger.error(
+                                    "DOGE submitauxblock error (code %d): %s",
+                                    error_code,
+                                    error_msg,
+                                )
+                        else:
+                            result = js.get("result")
+                            if result:
+                                self.logger.info(
+                                    "✓ DOGE BLOCK ACCEPTED! Result: %s", result
+                                )
+                            else:
+                                # Log detailed info about why the submission was rejected
+                                self.logger.warning(
+                                    "DOGE submitauxblock returned false (rejected)"
+                                )
+                                self.logger.warning(
+                                    "  Submitted aux_hash: %s",
+                                    state.doge_job.aux_hash,
+                                )
+                                self.logger.warning(
+                                    "  Aux job age: %ds (created at height %s)",
+                                    doge_age,
+                                    getattr(state.doge_job, "height", "unknown"),
+                                )
+                                self.logger.warning("  Possible causes:")
+                                self.logger.warning(
+                                    "    - DOGE found a new block, invalidating this aux_hash"
+                                )
+                                self.logger.warning(
+                                    "    - Parent block hash mismatch in AuxPoW"
+                                )
+                                self.logger.warning(
+                                    "    - Coinbase doesn't contain the aux_hash commitment"
+                                )
+                    except Exception as e:
+                        self.logger.error("DOGE submit failed: %s", e)
         return True
 
     async def handle_eth_submitHashrate(self, hashrate: str, clientid: str):

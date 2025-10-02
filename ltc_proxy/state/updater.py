@@ -6,7 +6,7 @@ from ..consensus.coinbase import build_coinbase
 from ..consensus.targets import (
     target_to_diff1,
 )
-from ..consensus.auxpow import refresh_aux_job
+from ..consensus.auxpow import refresh_aux_job, refresh_doge_job
 
 
 async def update_once(state, settings, http: ClientSession, force_update: bool = False):
@@ -25,12 +25,21 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
     witness_hex = r["default_witness_commitment"]
     target_hex = r["target"]
 
-    # Refresh aux job - force if we have a new LTC block or explicit force
+    # Refresh aux job (MEWC) - force if we have a new LTC block or explicit force
     await refresh_aux_job(
         state,
         http,
         settings.aux_url,
         settings.aux_address,
+        force_update=(state.height != height_int) or force_update,
+    )
+
+    # Refresh doge job - force if we have a new LTC block or explicit force
+    await refresh_doge_job(
+        state,
+        http,
+        settings.doge_url,
+        settings.doge_address,
         force_update=(state.height != height_int) or force_update,
     )
 
@@ -62,10 +71,21 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
     final_target = target_hex
     state.ltc_original_target = target_hex
     state.target_source = "LTC"
-    if settings.use_easier_target and state.aux_job and state.aux_job.target:
-        if int(state.aux_job.target, 16) > int(final_target, 16):
-            final_target = state.aux_job.target
-            state.target_source = "MEWC"
+
+    # If use_easier_target is enabled, check both DOGE and MEWC targets
+    if settings.use_easier_target:
+        # Check DOGE target
+        if state.doge_job and state.doge_job.target:
+            if int(state.doge_job.target, 16) > int(final_target, 16):
+                final_target = state.doge_job.target
+                state.target_source = "DOGE"
+
+        # Check MEWC target
+        if state.aux_job and state.aux_job.target:
+            if int(state.aux_job.target, 16) > int(final_target, 16):
+                final_target = state.aux_job.target
+                state.target_source = "MEWC"
+
     state.target = final_target
 
     roll_due = (state.timestamp == -1) or (state.timestamp + ROLL_SECONDS <= ts)
@@ -80,7 +100,7 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
                 + state.mm_tree_size.to_bytes(4, "little")
                 + state.mm_nonce.to_bytes(4, "little")
             )
-        proxy_sig = (settings.proxy_signature or "/ltc-mewc-stratum-proxy/").encode(
+        proxy_sig = (settings.proxy_signature or "/ltc-auxpow-stratum-proxy/").encode(
             "utf-8"
         )
         arbitrary = mm_tag + proxy_sig

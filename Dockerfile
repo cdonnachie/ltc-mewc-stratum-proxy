@@ -28,7 +28,7 @@ RUN chmod +x /app/entrypoint.sh
 RUN mkdir -p /app/submit_history
 
 # Expose stratum port
-EXPOSE 54321
+EXPOSE 50000
 
 # Run the proxy
 CMD ["/app/entrypoint.sh"]

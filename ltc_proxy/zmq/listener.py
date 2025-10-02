@@ -144,11 +144,11 @@ class ZMQListener:
         return f"ZMQListener(name='{self.name}', endpoint='{self.zmq_endpoint}', running={self._running})"
 
 
-class DualZMQListener:
+class TripleZMQListener:
     """
-    Manages both LTC and MEWC ZMQ listeners for dual-chain mining.
+    Manages LTC, DOGE, and MEWC ZMQ listeners for multi-chain mining.
 
-    Coordinates listening to both parent chain (LTC) and auxiliary chain (MEWC)
+    Coordinates listening to parent chain (LTC) and auxiliary chains (DOGE, MEWC)
     block notifications for optimal AuxPoW mining efficiency.
     """
 
@@ -156,21 +156,26 @@ class DualZMQListener:
         self,
         ltc_endpoint: Optional[str],
         mewc_endpoint: Optional[str],
+        doge_endpoint: Optional[str],
         on_ltc_block: Optional[Callable],
         on_mewc_block: Optional[Callable],
+        on_doge_block: Optional[Callable],
     ):
         """
-        Initialize dual ZMQ listener.
+        Initialize triple ZMQ listener.
 
         Args:
             ltc_endpoint: LTC ZMQ endpoint URL (None to disable LTC listening)
             mewc_endpoint: MEWC ZMQ endpoint URL (None to disable MEWC listening)
+            doge_endpoint: DOGE ZMQ endpoint URL (None to disable DOGE listening)
             on_ltc_block: Callback for LTC block notifications
             on_mewc_block: Callback for MEWC block notifications
+            on_doge_block: Callback for DOGE block notifications
         """
         self.ltc_listener = None
         self.mewc_listener = None
-        self.logger = logging.getLogger("DualZMQ")
+        self.doge_listener = None
+        self.logger = logging.getLogger("TripleZMQ")
 
         # Create listeners if endpoints are provided
         if ltc_endpoint and on_ltc_block:
@@ -179,11 +184,14 @@ class DualZMQListener:
         if mewc_endpoint and on_mewc_block:
             self.mewc_listener = ZMQListener("MEWC", mewc_endpoint, on_mewc_block)
 
-        if not self.ltc_listener and not self.mewc_listener:
+        if doge_endpoint and on_doge_block:
+            self.doge_listener = ZMQListener("DOGE", doge_endpoint, on_doge_block)
+
+        if not self.ltc_listener and not self.mewc_listener and not self.doge_listener:
             self.logger.warning("No ZMQ listeners configured")
 
     async def start(self):
-        """Start both listeners concurrently"""
+        """Start all listeners concurrently"""
         tasks = []
 
         if self.ltc_listener:
@@ -194,6 +202,10 @@ class DualZMQListener:
             self.logger.info("Starting MEWC ZMQ listener...")
             tasks.append(asyncio.create_task(self.mewc_listener.start()))
 
+        if self.doge_listener:
+            self.logger.info("Starting DOGE ZMQ listener...")
+            tasks.append(asyncio.create_task(self.doge_listener.start()))
+
         if tasks:
             self.logger.info(f"Starting {len(tasks)} ZMQ listener(s)...")
             # Run both listeners concurrently, but handle exceptions independently
@@ -202,13 +214,20 @@ class DualZMQListener:
             # Log any exceptions that occurred
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    listener_name = "LTC" if i == 0 and self.ltc_listener else "MEWC"
+                    if i == 0 and self.ltc_listener:
+                        listener_name = "LTC"
+                    elif i == 1 and self.mewc_listener:
+                        listener_name = "MEWC"
+                    elif i == 2 and self.doge_listener:
+                        listener_name = "DOGE"
+                    else:
+                        listener_name = "Unknown"
                     self.logger.error(f"{listener_name} ZMQ listener failed: {result}")
         else:
             self.logger.warning("No ZMQ listeners to start")
 
     async def stop(self):
-        """Stop both listeners"""
+        """Stop all listeners"""
         tasks = []
 
         if self.ltc_listener:
@@ -216,6 +235,9 @@ class DualZMQListener:
 
         if self.mewc_listener:
             tasks.append(asyncio.create_task(self.mewc_listener.stop()))
+
+        if self.doge_listener:
+            tasks.append(asyncio.create_task(self.doge_listener.stop()))
 
         if tasks:
             self.logger.info("Stopping ZMQ listeners...")
@@ -227,10 +249,11 @@ class DualZMQListener:
         """Check if any listener is currently running"""
         ltc_running = self.ltc_listener.is_running if self.ltc_listener else False
         mewc_running = self.mewc_listener.is_running if self.mewc_listener else False
-        return ltc_running or mewc_running
+        doge_running = self.doge_listener.is_running if self.doge_listener else False
+        return ltc_running or mewc_running or doge_running
 
     def get_status(self) -> dict:
-        """Get status of both listeners"""
+        """Get status of all listeners"""
         return {
             "ltc": {
                 "configured": self.ltc_listener is not None,
@@ -248,8 +271,17 @@ class DualZMQListener:
                     self.mewc_listener.zmq_endpoint if self.mewc_listener else None
                 ),
             },
+            "doge": {
+                "configured": self.doge_listener is not None,
+                "running": (
+                    self.doge_listener.is_running if self.doge_listener else False
+                ),
+                "endpoint": (
+                    self.doge_listener.zmq_endpoint if self.doge_listener else None
+                ),
+            },
         }
 
     def __repr__(self):
         status = self.get_status()
-        return f"DualZMQListener(ltc_running={status['ltc']['running']}, mewc_running={status['mewc']['running']})"
+        return f"TripleZMQListener(ltc_running={status['ltc']['running']}, mewc_running={status['mewc']['running']}, doge_running={status['doge']['running']})"

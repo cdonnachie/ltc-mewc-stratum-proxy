@@ -16,6 +16,11 @@ class Settings:
     aux_rpcuser: str = ""
     aux_rpcpass: str = ""
     aux_address: str = ""
+    doge_rpcip: str = ""
+    doge_rpcport: int = 0
+    doge_rpcuser: str = ""
+    doge_rpcpass: str = ""
+    doge_address: str = ""
     proxy_signature: str = ""
     use_easier_target: bool = False
     testnet: bool = False
@@ -25,11 +30,12 @@ class Settings:
     enable_zmq: bool = False
     ltc_zmq_endpoint: str = ""
     mewc_zmq_endpoint: str = ""
+    doge_zmq_endpoint: str = ""
     share_difficulty_divisor: float = 1000.0
 
     def __post_init__(self):
         """Load settings from environment variables at instance creation time"""
-        self.port = int(os.getenv("STRATUM_PORT", "54321"))
+        self.port = int(os.getenv("STRATUM_PORT", "50000"))
         self.rpcip = os.getenv("LTC_RPC_HOST", os.getenv("LTC_RPC_IP", "litecoin"))
         self.rpcport = int(os.getenv("LTC_RPC_PORT", "9332"))
         self.rpcuser = os.getenv("LTC_RPC_USER", "")
@@ -41,7 +47,16 @@ class Settings:
         self.aux_rpcuser = os.getenv("MEWC_RPC_USER", "")
         self.aux_rpcpass = os.getenv("MEWC_RPC_PASS", "")
         self.aux_address = os.getenv("MEWC_WALLET_ADDRESS", "")
-        self.proxy_signature = os.getenv("PROXY_SIGNATURE", "/ltc-mewc-stratum-proxy/")
+        self.doge_rpcip = os.getenv(
+            "DOGE_RPC_HOST", os.getenv("DOGE_RPC_IP", "dogecoin")
+        )
+        self.doge_rpcport = int(os.getenv("DOGE_RPC_PORT", "22555"))
+        self.doge_rpcuser = os.getenv("DOGE_RPC_USER", "")
+        self.doge_rpcpass = os.getenv("DOGE_RPC_PASS", "")
+        self.doge_address = os.getenv("DOGE_WALLET_ADDRESS", "")
+        self.proxy_signature = os.getenv(
+            "PROXY_SIGNATURE", "/ltc-auxpow-stratum-proxy/"
+        )
         self.use_easier_target = (
             os.getenv("USE_EASIER_TARGET", "true").lower() == "true"
         )
@@ -53,6 +68,7 @@ class Settings:
         self.enable_zmq = os.getenv("ENABLE_ZMQ", "true").lower() == "true"
         self.ltc_zmq_endpoint = os.getenv("LTC_ZMQ_ENDPOINT", "tcp://litecoin:28332")
         self.mewc_zmq_endpoint = os.getenv("MEWC_ZMQ_ENDPOINT", "tcp://meowcoin:28433")
+        self.doge_zmq_endpoint = os.getenv("DOGE_ZMQ_ENDPOINT", "tcp://dogecoin:28444")
         # Share difficulty divisor: share_diff = network_diff / divisor
         # Higher value = easier shares = more frequent submissions
         # 1.0 = only blocks, 1000.0 = balanced, 10000.0 = very frequent
@@ -73,4 +89,15 @@ class Settings:
             and self.aux_rpcport
         ):
             return f"http://{self.aux_rpcuser}:{self.aux_rpcpass}@{self.aux_rpcip}:{self.aux_rpcport}"
+        return None
+
+    @property
+    def doge_url(self) -> str | None:
+        if (
+            self.doge_rpcuser
+            and self.doge_rpcpass
+            and self.doge_rpcip
+            and self.doge_rpcport
+        ):
+            return f"http://{self.doge_rpcuser}:{self.doge_rpcpass}@{self.doge_rpcip}:{self.doge_rpcport}"
         return None

@@ -6,7 +6,7 @@
 ARGS=(
     "python" "-m" "ltc_proxy.main"
     "--ip=0.0.0.0"
-    "--port=${STRATUM_PORT:-54321}"
+    "--port=${STRATUM_PORT:-50000}"
     "--rpcip=litecoin"
     "--rpcport=${LTC_RPC_PORT:-9332}"
     "--rpcuser=${LTC_RPC_USER}"

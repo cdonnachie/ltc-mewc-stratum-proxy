@@ -1,6 +1,50 @@
-# Litecoin-Meowcoin Stratum Proxy
+# Litecoin Multi-Chain Stratum Proxy
 
-A stratum mining proxy for Litecoin with optional Meowcoin merged mining (AuxPoW).
+A flexible stratum mining proxy for Litecoin with optional merge mining (AuxPoW) support for Dogecoin and/or Meowcoin.
+
+## Merge Mining Modes
+
+This proxy supports **flexible merge mining configurations**. Choose the mode that best suits your needs:
+
+| Mode           | Command                                | Chains              | Disk (Full) | Disk (Pruned) | RAM   | Difficulty  |
+| -------------- | -------------------------------------- | ------------------- | ----------- | ------------- | ----- | ----------- |
+| **LTC Only**   | `docker compose up -d`                 | Litecoin only       | ~200GB      | ~10GB         | 2GB   | Standard    |
+| **LTC + DOGE** | `docker compose --profile doge up -d`  | Litecoin + Dogecoin | ~280GB      | ~20GB         | 3-4GB | Recommended |
+| **LTC + MEWC** | `docker cCheck blockchain sync status: |
+
+```bash
+# Litecoin
+docker compose exec litecoin litecoin-cli -datadir="/home/litecoin/.litecoin" getblockchaininfo
+
+# Dogecoin
+docker compose exec dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getblockchaininfo
+
+# Meowcoin
+docker compose exec meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" getblockchaininfo
+```
+
+Check mining info:
+
+````bash
+# Litecoin
+docker compose exec litecoin litecoin-cli -datadir="/home/litecoin/.litecoin" getmininginfo
+
+# Dogecoin
+docker compose exec dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getmininginfo
+
+# Meowcoin
+docker compose exec meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" getmininginfo
+```wc up -d` | Litecoin + Meowcoin | ~205GB      | ~12GB         | 3GB   | Light       |
+| **LTC + DOGE + MEWC** | `docker compose --profile full up -d` | All three chains    | ~285GB      | ~22GB         | 4-5GB | Advanced    |
+
+**Most Popular:** LTC + DOGE (Dogecoin has excellent liquidity and value)
+
+### How to Choose
+
+- **LTC Only**: Just want Litecoin rewards, minimal resources
+- **LTC + DOGE**: Best value - Dogecoin is popular and liquid
+- **LTC + MEWC**: Smaller chain, lower difficulty, good for testing
+- **LTC + DOGE + MEWC**: Maximum rewards, but requires most resources
 
 ## Quick Start
 
@@ -13,42 +57,67 @@ Choose your setup method:
 1. **Place Linux binaries**:
 
    ```bash
-   # Copy Linux x86_64 binaries (NOT Windows/macOS)
+   # Required for all modes:
    binaries/litecoin/litecoind
    binaries/litecoin/litecoin-cli
+
+   # Required for LTC+DOGE or LTC+DOGE+MEWC:
+   binaries/dogecoin/dogecoind
+   binaries/dogecoin/dogecoin-cli
+
+   # Required for LTC+MEWC or LTC+DOGE+MEWC:
    binaries/meowcoin/meowcoind
    binaries/meowcoin/meowcoin-cli
-   ```
+
+   # Copy Linux x86_64 binaries (NOT Windows/macOS)
+````
 
 2. **Configure environment**:
 
    ```bash
    cp .env.example .env
-   # Edit .env - set passwords and optionally MEWC_WALLET_ADDRESS for merged mining
+   # Edit .env - set passwords and wallet addresses for desired chains
+   # - Leave addresses blank for LTC only
+   # - Set DOGE_WALLET_ADDRESS for LTC+DOGE
+   # - Set MEWC_WALLET_ADDRESS for LTC+MEWC
+   # - Set both addresses for triple mining
    ```
 
-3. **Start services**:
+3. **Start services** (choose your mode):
 
    ```bash
-   docker-compose up -d
-   docker-compose logs -f stratum-proxy  # Watch logs
+   # LTC only (no merge mining)
+   docker compose up -d
+
+   # LTC + Dogecoin (recommended)
+   docker compose --profile doge up -d
+
+   # LTC + Meowcoin
+   docker compose --profile mewc up -d
+
+   # LTC + Dogecoin + Meowcoin (all chains)
+   docker compose --profile full up -d
+
+   # Watch logs
+   docker compose logs -f stratum-proxy
    ```
 
 4. **Connect miner**:
-   - Server: `localhost:54321`
+   - Server: `localhost:50000`
    - Username: Your Litecoin address
    - Password: anything
 
 ### Option 2: Native Python (Your Own Nodes)
 
-**Prerequisites:** Python 3.8+, running litecoind and meowcoind nodes
+**Prerequisites:** Python 3.8+, running litecoind and optionally dogecoind/meowcoind nodes
 
 1. **Configure blockchain nodes**:
 
    - Copy `config/litecoin.conf` to your Litecoin data directory
-   - Copy `config/meowcoin.conf` to your Meowcoin data directory (optional, for merged mining)
-   - Edit both files with secure passwords
-   - Start both daemons
+   - Copy `config/dogecoin.conf` to your Dogecoin data directory (optional, for DOGE mining)
+   - Copy `config/meowcoin.conf` to your Meowcoin data directory (optional, for MEWC mining)
+   - Edit all files with secure passwords
+   - Start desired daemons
 
 2. **Install Python dependencies**:
 
@@ -75,17 +144,20 @@ Choose your setup method:
 
 ### Essential Environment Variables
 
-| Variable                          | Description                        | Default            |
-| --------------------------------- | ---------------------------------- | ------------------ |
-| `LTC_RPC_PORT`                    | Litecoin RPC port                  | 9332               |
-| `LTC_RPC_USER` / `LTC_RPC_PASS`   | Litecoin RPC credentials           | -                  |
-| `MEWC_RPC_PORT`                   | Meowcoin RPC port                  | 8766               |
-| `MEWC_RPC_USER` / `MEWC_RPC_PASS` | Meowcoin RPC credentials           | -                  |
-| `MEWC_WALLET_ADDRESS`             | Meowcoin address for merged mining | (blank = LTC only) |
-| `STRATUM_PORT`                    | Port for miners to connect         | 54321              |
-| `SHARE_DIFFICULTY_DIVISOR`        | Share difficulty (higher = easier) | 1000.0             |
-| `USE_EASIER_TARGET`               | Use MEWC target if easier          | true               |
-| `ENABLE_ZMQ`                      | Enable ZMQ block notifications     | true               |
+| Variable                          | Description                         | Default            |
+| --------------------------------- | ----------------------------------- | ------------------ |
+| `LTC_RPC_PORT`                    | Litecoin RPC port                   | 9332               |
+| `LTC_RPC_USER` / `LTC_RPC_PASS`   | Litecoin RPC credentials            | -                  |
+| `DOGE_RPC_PORT`                   | Dogecoin RPC port                   | 22555              |
+| `DOGE_RPC_USER` / `DOGE_RPC_PASS` | Dogecoin RPC credentials            | -                  |
+| `DOGE_WALLET_ADDRESS`             | Dogecoin address for merge mining   | (blank = disabled) |
+| `MEWC_RPC_PORT`                   | Meowcoin RPC port                   | 8766               |
+| `MEWC_RPC_USER` / `MEWC_RPC_PASS` | Meowcoin RPC credentials            | -                  |
+| `MEWC_WALLET_ADDRESS`             | Meowcoin address for merge mining   | (blank = disabled) |
+| `STRATUM_PORT`                    | Port for miners to connect          | 50000              |
+| `SHARE_DIFFICULTY_DIVISOR`        | Share difficulty (higher = easier)  | 1000.0             |
+| `USE_EASIER_TARGET`               | Use easiest target among all chains | true               |
+| `ENABLE_ZMQ`                      | Enable ZMQ block notifications      | true               |
 
 ### Share Difficulty
 
@@ -97,54 +169,72 @@ Choose your setup method:
 
 ## Merged Mining (AuxPoW)
 
-When `MEWC_WALLET_ADDRESS` is set, the proxy enables merged mining. Here's how it works:
+When auxiliary chain wallet addresses are set, the proxy enables merged mining. You can mine:
+
+- **LTC + DOGE** (set `DOGE_WALLET_ADDRESS`)
+- **LTC + MEWC** (set `MEWC_WALLET_ADDRESS`)
+- **LTC + DOGE + MEWC** (set both addresses)
+
+Here's how it works:
 
 ### How It Works
 
-Both Litecoin (LTC) and Meowcoin (MEWC) use the **same Scrypt PoW hash** for difficulty validation:
+Litecoin (LTC), Dogecoin (DOGE), and Meowcoin (MEWC) all use the **same Scrypt PoW hash** for difficulty validation:
 
 ```
 Block Header (80 bytes)
     ↓
-Scrypt PoW hash → Compare with both LTC and MEWC targets
+Scrypt PoW hash → Compare with LTC, DOGE, and MEWC targets
     ↓
     ├─→ Meets LTC target? → Submit to LTC → Earn LTC
+    ├─→ Meets DOGE target? → Submit AuxPoW to DOGE → Earn DOGE
     └─→ Meets MEWC target? → Submit AuxPoW to MEWC → Earn MEWC
 
-Example at typical difficulties (LTC: 0.008, MEWC: 0.007):
+Example at typical difficulties:
   Scrypt PoW: 0x00000065...
 
   Compare: 0x00000065... < 0x0000007e... (LTC target) → ✗ No
+  Compare: 0x00000065... < 0x00000078... (DOGE target) → ✓ Yes!
   Compare: 0x00000065... < 0x00000080... (MEWC target) → ✓ Yes!
 
-  Result: Submit to MEWC only, earn MEWC rewards
+  Result: Submit to DOGE and MEWC, earn both rewards!
 ```
 
 ### AuxPoW Structure
 
-When submitting to MEWC, the proxy creates an AuxPoW proof containing:
+When submitting to auxiliary chains (DOGE/MEWC), the proxy creates an AuxPoW proof containing:
 
 - Parent (LTC) coinbase transaction
 - Parent block hash (double SHA-256) - for block identification
 - Merkle proofs
 - Parent block header (80 bytes)
 
-**Important**: While double SHA-256 is used for the block hash in the AuxPoW structure (what appears on block explorers), both chains validate difficulty using the **Scrypt PoW hash**.
+**Important**: While double SHA-256 is used for the block hash in the AuxPoW structure (what appears on block explorers), all chains validate difficulty using the **Scrypt PoW hash**.
 
 ### Block Finding Scenarios
 
-At typical difficulties (LTC: ~0.008, MEWC: ~0.007):
+With typical difficulties, you'll find blocks on different chains:
 
-1. **MEWC only**: Scrypt PoW meets MEWC target → Submit AuxPoW → Earn MEWC (most common, easier target)
-2. **LTC only**: Scrypt PoW meets LTC target → Submit block → Earn LTC (less common, harder target)
+**Dual Mining (LTC + DOGE):**
+
+1. **DOGE only**: Scrypt PoW meets DOGE target → Submit AuxPoW → Earn DOGE (common)
+2. **LTC only**: Scrypt PoW meets LTC target → Submit block → Earn LTC (less common)
 3. **Both chains**: Scrypt PoW meets BOTH targets → Submit to both → Double rewards! (rare)
 
-**Why MEWC blocks are more common:**
+**Triple Mining (LTC + DOGE + MEWC):**
 
-- MEWC typically has an easier target (~0.007 vs ~0.008)
-- Both chains check the same Scrypt PoW hash
-- The easier target means more shares qualify for MEWC
-- **Result**: You'll find more MEWC blocks than LTC blocks
+1. **MEWC only**: Easiest target → Most common finds
+2. **DOGE only**: Medium target → Regular finds
+3. **MEWC + DOGE**: Both aux targets met → Double aux rewards!
+4. **LTC only**: Hardest target → Rare but valuable
+5. **All three**: Jackpot! → Triple rewards! (very rare)
+
+**Why auxiliary blocks are more common:**
+
+- Auxiliary chains typically have easier targets than Litecoin
+- All chains check the same Scrypt PoW hash
+- The easier target means more shares qualify for auxiliary chains
+- **Result**: You'll find more DOGE/MEWC blocks than LTC blocks
 
 **Note:** The proxy automatically uses whichever target is easier when `USE_EASIER_TARGET=true`.
 
@@ -153,13 +243,14 @@ At typical difficulties (LTC: ~0.008, MEWC: ~0.007):
 **Block submissions** are logged to `./submit_history/`:
 
 - `LTC_<height>_<job>_<time>.txt` - Litecoin blocks
+- `DOGE_<height>_<job>_<time>.txt` - Dogecoin AuxPoW blocks
 - `MEWC_<height>_<job>_<time>.txt` - Meowcoin AuxPoW blocks
 
 **Check logs:**
 
 ```bash
 # Docker
-docker-compose logs -f stratum-proxy
+docker compose logs -f stratum-proxy
 
 # Native
 # Watch console output
@@ -169,13 +260,15 @@ docker-compose logs -f stratum-proxy
 
 **"Coinbase parts not ready"**: Nodes still syncing, wait for full sync
 
-**"MEWC aux job is stale"**: Normal when MEWC finds blocks, proxy auto-refreshes
+**"DOGE/MEWC aux job is stale"**: Normal when auxiliary chains find blocks, proxy auto-refreshes
 
 **Miner can't connect**: Check firewall, verify STRATUM_PORT is correct
 
 **Binary format error**: Must use Linux ELF x86_64 binaries for Docker
 
 **Low hashrate**: Increase `SHARE_DIFFICULTY_DIVISOR` for more frequent feedback
+
+**Service won't start with profile**: Ensure binaries exist for that chain (e.g., `binaries/dogecoin/` for `--profile doge`)
 
 ## Advanced
 
@@ -184,9 +277,10 @@ docker-compose logs -f stratum-proxy
 The proxy uses ZMQ for instant block notifications instead of polling:
 
 - **LTC**: Port 28332
+- **DOGE**: Port 28444
 - **MEWC**: Port 28433
 
-Both conf files include ZMQ settings. Disable with `ENABLE_ZMQ=false` if needed.
+All conf files include ZMQ settings. Disable with `ENABLE_ZMQ=false` if needed.
 
 ### Job IDs
 
@@ -194,7 +288,28 @@ Job IDs are Unix timestamps (e.g., `66fb8a10`), updated:
 
 - On new blocks (via ZMQ)
 - Every 30 seconds (nTime rolls)
-- When MEWC creates new template
+- When auxiliary chains create new templates
+
+### Docker Profiles
+
+Use profiles to control which chains run:
+
+```bash
+# LTC only (no profile needed)
+docker compose up -d
+
+# Add Dogecoin
+docker compose --profile doge up -d
+
+# Add Meowcoin
+docker compose --profile mewc up -d
+
+# All chains
+docker compose --profile full up -d
+
+# Stop specific profile
+docker compose --profile doge down
+```
 
 ### Project Structure
 
@@ -208,18 +323,25 @@ ltc_proxy/
 └── zmq/          # ZMQ block listeners
 ```
 
+## Additional Documentation
+
+- **[Quick Start Guide](QUICK_START_MULTI_CHAIN.md)** - Fast setup with checklists and examples
+- **[Choosing a Mode](CHOOSING_A_MODE.md)** - Detailed comparison to help you decide
+- **[Implementation Details](MULTI_CHAIN_IMPLEMENTATION.md)** - Technical architecture and design
+
 ## License
 
 MIT License - See LICENSE file
 
-A Docker Compose setup for running a stratum proxy that enables mining Litecoin (parent chain) and Meowcoin (auxiliary chain) simultaneously using AuxPoW.
+A Docker Compose setup for running a stratum proxy that enables mining Litecoin (parent chain) with optional merge mining of Dogecoin and/or Meowcoin (auxiliary chains) using AuxPoW.
 
 ## Quick Start
 
 1. **Place the Linux binaries**:
 
    - Copy **Linux x86_64** `litecoind` and `litecoin-cli` to `binaries/litecoin/`
-   - Copy **Linux x86_64** `meowcoind` and `meowcoin-cli` to `binaries/meowcoin/`
+   - Copy **Linux x86_64** `dogecoind` and `dogecoin-cli` to `binaries/dogecoin/` (optional, for DOGE mining)
+   - Copy **Linux x86_64** `meowcoind` and `meowcoin-cli` to `binaries/meowcoin/` (optional, for MEWC mining)
 
    ⚠️ **Important**: Use Linux binaries only (not Windows .exe or macOS binaries)
 
@@ -233,7 +355,8 @@ A Docker Compose setup for running a stratum proxy that enables mining Litecoin 
 3. **Configure wallet addresses** (optional):
    Edit the `.env` file and set:
 
-   - `MEWC_WALLET_ADDRESS`: Your Meowcoin address for dual-chain mining (leave blank for Litecoin-only mining)
+   - `DOGE_WALLET_ADDRESS`: Your Dogecoin address for LTC+DOGE mining (leave blank to disable)
+   - `MEWC_WALLET_ADDRESS`: Your Meowcoin address for LTC+MEWC mining (leave blank to disable)
    - Update RPC credentials for security
 
 4. **Start the services**:
@@ -249,7 +372,7 @@ A Docker Compose setup for running a stratum proxy that enables mining Litecoin 
    ```
 
 6. **Connect your miner**:
-   - Point your miner to `localhost:54321`
+   - Point your miner to `localhost:50000`
    - Use your Litecoin address as username
    - Any password
 
@@ -257,24 +380,29 @@ A Docker Compose setup for running a stratum proxy that enables mining Litecoin 
 
 ### Environment Variables
 
-| Variable                   | Description                                            | Default                   |
-| -------------------------- | ------------------------------------------------------ | ------------------------- |
-| `LTC_RPC_USER`             | Litecoin RPC username                                  | litecoin_user             |
-| `LTC_RPC_PASS`             | Litecoin RPC password                                  | -                         |
-| `LTC_RPC_PORT`             | Litecoin RPC port                                      | 9332                      |
-| `LTC_P2P_PORT`             | Litecoin P2P port                                      | 9333                      |
-| `MEWC_RPC_USER`            | Meowcoin RPC username                                  | meowcoin_user             |
-| `MEWC_RPC_PASS`            | Meowcoin RPC password                                  | -                         |
-| `MEWC_RPC_PORT`            | Meowcoin RPC port                                      | 8766                      |
-| `MEWC_P2P_PORT`            | Meowcoin P2P port                                      | 8767                      |
-| `MEWC_WALLET_ADDRESS`      | Meowcoin wallet address (blank = primary-only mode)    | (blank - disables AuxPoW) |
-| `STRATUM_PORT`             | Stratum proxy port                                     | 54321                     |
-| `PROXY_SIGNATURE`          | Custom coinbase signature                              | /ltc-stratum-proxy/       |
-| `USE_EASIER_TARGET`        | Enable easier target selection                         | true                      |
-| `SHARE_DIFFICULTY_DIVISOR` | Share difficulty divisor (higher = easier/more shares) | 1000.0                    |
-| `TESTNET`                  | Use testnet                                            | false                     |
-| `VERBOSE`                  | Enable verbose logging                                 | true                      |
-| `SHOW_JOBS`                | Show job updates in logs                               | true                      |
+| Variable                   | Description                                            | Default                 |
+| -------------------------- | ------------------------------------------------------ | ----------------------- |
+| `LTC_RPC_USER`             | Litecoin RPC username                                  | litecoin_user           |
+| `LTC_RPC_PASS`             | Litecoin RPC password                                  | -                       |
+| `LTC_RPC_PORT`             | Litecoin RPC port                                      | 9332                    |
+| `LTC_P2P_PORT`             | Litecoin P2P port                                      | 9333                    |
+| `DOGE_RPC_USER`            | Dogecoin RPC username                                  | dogecoin_user           |
+| `DOGE_RPC_PASS`            | Dogecoin RPC password                                  | -                       |
+| `DOGE_RPC_PORT`            | Dogecoin RPC port                                      | 22555                   |
+| `DOGE_P2P_PORT`            | Dogecoin P2P port                                      | 22556                   |
+| `DOGE_WALLET_ADDRESS`      | Dogecoin wallet address (blank = disabled)             | (blank - disables DOGE) |
+| `MEWC_RPC_USER`            | Meowcoin RPC username                                  | meowcoin_user           |
+| `MEWC_RPC_PASS`            | Meowcoin RPC password                                  | -                       |
+| `MEWC_RPC_PORT`            | Meowcoin RPC port                                      | 8766                    |
+| `MEWC_P2P_PORT`            | Meowcoin P2P port                                      | 8767                    |
+| `MEWC_WALLET_ADDRESS`      | Meowcoin wallet address (blank = disabled)             | (blank - disables MEWC) |
+| `STRATUM_PORT`             | Stratum proxy port                                     | 50000                   |
+| `PROXY_SIGNATURE`          | Custom coinbase signature                              | /ltc-stratum-proxy/     |
+| `USE_EASIER_TARGET`        | Enable easier target selection                         | true                    |
+| `SHARE_DIFFICULTY_DIVISOR` | Share difficulty divisor (higher = easier/more shares) | 1000.0                  |
+| `TESTNET`                  | Use testnet                                            | false                   |
+| `VERBOSE`                  | Enable verbose logging                                 | true                    |
+| `SHOW_JOBS`                | Show job updates in logs                               | true                    |
 
 ## Binary Setup
 
@@ -284,12 +412,17 @@ This setup uses local binaries instead of pre-built Docker images, giving you co
 
 Place the following files in their respective directories:
 
-**Litecoin** (`binaries/litecoin/`):
+**Litecoin** (`binaries/litecoin/`) - Required:
 
 - `litecoind` - The main daemon
 - `litecoin-cli` - CLI client
 
-**Meowcoin** (`binaries/meowcoin/`):
+**Dogecoin** (`binaries/dogecoin/`) - Optional (for DOGE mining):
+
+- `dogecoind` - The main daemon
+- `dogecoin-cli` - CLI client
+
+**Meowcoin** (`binaries/meowcoin/`) - Optional (for MEWC mining):
 
 - `meowcoind` - The main daemon
 - `meowcoin-cli` - CLI client
@@ -316,6 +449,7 @@ Check if binaries are correct format:
 
 ```bash
 file binaries/litecoin/litecoind
+file binaries/dogecoin/dogecoind
 file binaries/meowcoin/meowcoind
 ```
 
@@ -323,6 +457,7 @@ file binaries/meowcoin/meowcoind
 
 ```
 binaries/litecoin/litecoind: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, stripped
+binaries/dogecoin/dogecoind: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, stripped
 binaries/meowcoin/meowcoind: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, stripped
 ```
 
@@ -336,11 +471,14 @@ binaries/meowcoin/meowcoind: ELF 64-bit LSB executable, x86-64, version 1 (SYSV)
 - **litecoin**: Litecoin daemon (parent chain)
   - RPC: `localhost:9332`
   - P2P: `localhost:9333`
-- **meowcoin**: Meowcoin daemon (auxiliary chain)
+- **dogecoin**: Dogecoin daemon (auxiliary chain, optional)
+  - RPC: `localhost:22555`
+  - P2P: `localhost:22556`
+- **meowcoin**: Meowcoin daemon (auxiliary chain, optional)
   - RPC: `localhost:8766`
   - P2P: `localhost:8767`
 - **stratum-proxy**: Mining proxy
-  - Stratum: `localhost:54321`
+  - Stratum: `localhost:50000`
 
 ## Customization
 
@@ -379,7 +517,7 @@ If you prefer to run the proxy directly with Python instead of using Docker:
 #### Prerequisites
 
 1. **Python 3.8+** installed on your system
-2. **Litecoin and Meowcoin nodes** running separately (either locally or remotely)
+2. **Litecoin node** running (required), and optionally **Dogecoin and/or Meowcoin nodes** (for merge mining)
 3. **Python dependencies** installed
 
 #### Setup Steps
@@ -395,18 +533,20 @@ If you prefer to run the proxy directly with Python instead of using Docker:
    For convenience, you can use the provided configuration templates:
 
    - **Litecoin**: Copy `litecoin.conf` to your Litecoin data directory
-   - **Meowcoin**: Copy `meowcoin.conf` to your Meowcoin data directory
+   - **Dogecoin**: Copy `dogecoin.conf` to your Dogecoin data directory (optional)
+   - **Meowcoin**: Copy `meowcoin.conf` to your Meowcoin data directory (optional)
 
    **Data directory locations:**
 
-   - Windows: `%APPDATA%\Litecoin\` and `%APPDATA%\Meowcoin\`
-   - Linux: `~/.litecoin/` and `~/.meowcoin/`
-   - macOS: `~/Library/Application Support/Litecoin/` and `~/Library/Application Support/Meowcoin/`
+   - Windows: `%APPDATA%\Litecoin\`, `%APPDATA%\Dogecoin\`, and `%APPDATA%\Meowcoin\`
+   - Linux: `~/.litecoin/`, `~/.dogecoin/`, and `~/.meowcoin/`
+   - macOS: `~/Library/Application Support/Litecoin/`, `~/Library/Application Support/Dogecoin/`, and `~/Library/Application Support/Meowcoin/`
 
 3. **Ensure your nodes are running**:
 
    - Litecoin node accessible via RPC (default: `localhost:9332`)
-   - Meowcoin node accessible via RPC (default: `localhost:8766`)
+   - Dogecoin node accessible via RPC (default: `localhost:22555`) - optional
+   - Meowcoin node accessible via RPC (default: `localhost:8766`) - optional
 
 4. **Run the proxy**:
 
@@ -415,7 +555,7 @@ If you prefer to run the proxy directly with Python instead of using Docker:
    ```bash
    python -m ltc_proxy.run \
      --ip=127.0.0.1 \
-     --port=54321 \
+     --port=50000 \
      --rpcuser=your_ltc_rpc_user \
      --rpcpass=your_ltc_rpc_password \
      --rpcip=127.0.0.1 \
@@ -434,7 +574,7 @@ If you prefer to run the proxy directly with Python instead of using Docker:
    ```bash
    python -m ltc_proxy.run \
      --ip=0.0.0.0 \
-     --port=54321 \
+     --port=50000 \
      --rpcuser=your_ltc_rpc_user \
      --rpcpass=your_ltc_rpc_password \
      --aux-address=your_meowcoin_address \
@@ -487,9 +627,9 @@ The `--ip` parameter controls which network interface the proxy binds to:
 Run `python -m ltc_proxy.run --help` to see all available options:
 
 - `--ip`: IP address to bind proxy server on (default: 127.0.0.1)
-- `--port`: Stratum port (default: 54321)
+- `--port`: Stratum port (default: 50000)
 - `--rpcip/--rpcport`: Litecoin RPC connection
-- `--aux-rpcip/--aux-rpcport`: Meowcoin RPC connection
+- `--aux-rpcip/--aux-rpcport`: Auxiliary chain RPC connection (DOGE or MEWC)
 - `--proxy-signature`: Custom coinbase signature
 - `--use-easier-target`: Enable easier target selection
 - `--testnet`: Use testnet mode
@@ -515,6 +655,7 @@ docker compose logs -f
 # Specific service
 docker compose logs -f stratum-proxy
 docker compose logs -f litecoin
+docker compose logs -f dogecoin
 docker compose logs -f meowcoin
 ```
 
@@ -550,7 +691,7 @@ docker compose down && docker compose up -d
 **Choose Native Python if:**
 
 - You're developing or debugging the proxy
-- You already have Litecoin/Meowcoin nodes running
+- You already have Litecoin/Dogecoin/Meowcoin nodes running
 - You want minimal resource usage
 - You need fine-grained control
 
@@ -566,11 +707,11 @@ docker compose down && docker compose up -d
 Connect your miner to the stratum proxy:
 
 - **Host**: Your server IP
-- **Port**: 54321 (or your configured STRATUM_PORT)
+- **Port**: 50000 (or your configured STRATUM_PORT)
 - **Username**: Your Litecoin address (e.g., `ltc1qyour_litecoin_address.worker1`)
 - **Password**: Any value
 
-The first address that connects becomes the payout address for Litecoin rewards. If `MEWC_WALLET_ADDRESS` is configured, Meowcoin rewards go to that address. If `MEWC_WALLET_ADDRESS` is blank, only Litecoin will be mined (primary-only mode).
+The first address that connects becomes the payout address for Litecoin rewards. If `DOGE_WALLET_ADDRESS` is configured, Dogecoin rewards go to that address. If `MEWC_WALLET_ADDRESS` is configured, Meowcoin rewards go to that address. If both auxiliary addresses are blank, only Litecoin will be mined.
 
 #### Sample Miner Commands
 
@@ -578,10 +719,10 @@ The first address that connects becomes the payout address for Litecoin rewards.
 
 ```bash
 # For localhost testing
-minerd -a scrypt -o stratum+tcp://localhost:54321 -u ltc1qyour_litecoin_address -p x
+minerd -a scrypt -o stratum+tcp://localhost:50000 -u ltc1qyour_litecoin_address -p x
 
 # For remote server
-minerd -a scrypt -o stratum+tcp://192.168.1.100:54321 -u ltc1qyour_litecoin_address.worker1 -p x
+minerd -a scrypt -o stratum+tcp://192.168.1.100:50000 -u ltc1qyour_litecoin_address.worker1 -p x
 ```
 
 **HiveOS Configuration:**
@@ -589,7 +730,7 @@ minerd -a scrypt -o stratum+tcp://192.168.1.100:54321 -u ltc1qyour_litecoin_addr
 ```bash
 # Miner: Select your preferred Scrypt miner
 # Algorithm: scrypt
-# Pool: stratum+tcp://YOUR_SERVER_IP:54321
+# Pool: stratum+tcp://YOUR_SERVER_IP:50000
 # Wallet: ltc1qyour_litecoin_address.%WORKER_NAME%
 # Password: x
 ```
@@ -598,7 +739,7 @@ minerd -a scrypt -o stratum+tcp://192.168.1.100:54321 -u ltc1qyour_litecoin_addr
 
 ### Configuration Files
 
-The Docker containers automatically generate configuration files (`litecoin.conf` and `meowcoin.conf`) from your `.env` file settings. This ensures that CLI tools work properly and all settings are consistent.
+The Docker containers automatically generate configuration files (`litecoin.conf`, `dogecoin.conf`, and `meowcoin.conf`) from your `.env` file settings. This ensures that CLI tools work properly and all settings are consistent.
 
 **Generated configuration includes:**
 
@@ -636,6 +777,30 @@ su - litecoin
 litecoin-cli getmininginfo
 ```
 
+**Dogecoin Commands:**
+
+```bash
+# Get mining information
+docker compose exec -it dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getmininginfo
+
+# Get blockchain info
+docker compose exec -it dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getblockchaininfo
+
+# Get wallet info
+docker compose exec -it dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getwalletinfo
+
+# Generate new address
+docker compose exec -it dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getnewaddress
+
+# Get AuxPoW information
+docker compose exec -it dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getauxblock
+
+# Alternative: Switch to dogecoin user first
+docker compose exec -it dogecoin /bin/bash
+su - dogecoin
+dogecoin-cli getmininginfo
+```
+
 **Meowcoin Commands:**
 
 ```bash
@@ -670,6 +835,16 @@ litecoin-cli getmininginfo
 
 # Using explicit RPC parameters
 litecoin-cli -rpcuser=litecoin_user -rpcpassword=litecoin_password -rpcport=9332 getmininginfo
+```
+
+**Dogecoin Commands:**
+
+```bash
+# Using configuration file (recommended)
+dogecoin-cli getmininginfo
+
+# Using explicit RPC parameters
+dogecoin-cli -rpcuser=dogecoin_user -rpcpassword=dogecoin_password -rpcport=22555 getmininginfo
 ```
 
 **Meowcoin Commands:**
@@ -717,7 +892,7 @@ getblockchaininfo
 uptime
 ```
 
-**AuxPoW Specific (Meowcoin):**
+**AuxPoW Specific (Dogecoin/Meowcoin):**
 
 ```bash
 # Get auxiliary block for mining
@@ -738,7 +913,7 @@ If you encounter RPC authentication errors:
 
 ### Wallet Setup
 
-**Important**: Before generating addresses for Litecoin, you must first create and load a wallet. Meowcoin uses the traditional single wallet.dat file that is automatically created.
+**Important**: Litecoin requires creating and loading a wallet. Dogecoin and Meowcoin use the traditional single wallet.dat file that is automatically created.
 
 1. **Create Litecoin Wallet**:
 
@@ -756,14 +931,21 @@ If you encounter RPC authentication errors:
    docker compose exec -it litecoin litecoin-cli -datadir="/home/litecoin/.litecoin" getnewaddress
    ```
 
-3. **Generate Meowcoin Address** (optional, for dual-chain mining):
+3. **Generate Dogecoin Address** (optional, for DOGE mining):
+
+   ```bash
+   # Dogecoin uses traditional wallet.dat (auto-created on first run)
+   docker compose exec -it dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getnewaddress
+   ```
+
+4. **Generate Meowcoin Address** (optional, for MEWC mining):
 
    ```bash
    # Meowcoin uses traditional wallet.dat (auto-created on first run)
    docker compose exec -it meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" getnewaddress
    ```
 
-4. **Update .env file** with your addresses (optional - leave `MEWC_WALLET_ADDRESS` blank for Litecoin-only mining)
+5. **Update .env file** with your addresses (optional - leave auxiliary addresses blank to disable those chains)
 
 ### CLI Testing
 
@@ -778,6 +960,7 @@ test-cli.bat
 
 # Or manually test individual commands
 docker compose exec litecoin litecoin-cli -datadir="/home/litecoin/.litecoin" getblockchaininfo
+docker compose exec dogecoin dogecoin-cli -datadir="/home/dogecoin/.dogecoin" getblockchaininfo
 docker compose exec meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" getblockchaininfo
 ```
 
@@ -815,8 +998,8 @@ docker compose exec meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" ge
 
 ### Proxy Connection Issues
 
-- Verify both daemons are synced
-- Check RPC connectivity
+- Verify all enabled daemons are synced
+- Check RPC connectivity for each chain
 - Review proxy logs for errors
 
 ### Mining Issues
@@ -835,12 +1018,13 @@ docker compose exec meowcoin meowcoin-cli -datadir="/home/meowcoin/.meowcoin" ge
 ## File Structure
 
 ```
-ltc-mewc-stratum-proxy/
+ltc-auxpow-stratum-proxy/
 ├── docker-compose.yml       # Main compose file
 ├── .env.example             # Example environment configuration
 ├── .gitignore               # Git ignore rules
 ├── Dockerfile               # Proxy container build
 ├── Dockerfile.litecoin      # Litecoin daemon container
+├── Dockerfile.dogecoin      # Dogecoin daemon container
 ├── Dockerfile.meowcoin      # Meowcoin daemon container
 ├── entrypoint.sh            # Docker entrypoint script
 ├── requirements.txt         # Python dependencies
@@ -848,9 +1032,11 @@ ltc-mewc-stratum-proxy/
 ├── health-check.sh          # Health check scripts
 ├── binaries/                # Cryptocurrency binaries directory
 │   ├── litecoin/            # Litecoin binaries
+│   ├── dogecoin/            # Dogecoin binaries
 │   └── meowcoin/            # Meowcoin binaries
 ├── config/                  # Configuration templates directory
 │   ├── litecoin.conf        # Litecoin daemon config template
+│   ├── dogecoin.conf        # Dogecoin daemon config template
 │   └── meowcoin.conf        # Meowcoin daemon config template
 ├── ltc_proxy/               # Proxy application package
 │   ├── consensus/          # Block/transaction building

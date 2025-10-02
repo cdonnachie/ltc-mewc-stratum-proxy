@@ -52,6 +52,7 @@ Thumbs.db
 # Blockchain data
 litecoin-data/
 meowcoin-data/
+dogecoin-data/
 
 # Backup files
 *.bak

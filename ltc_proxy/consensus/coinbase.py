@@ -63,9 +63,9 @@ def build_coinbase(
     num_outputs = len(outputs)
     coinbase_txin = coinbase_txin_start + coinbase_txin_end
 
-    # Use version 8 for coinbase transactions (LTC/MEWC standard)
+    # Use version 2 for coinbase transactions (Litecoin standard with SegWit support)
     coinbase_wit = (
-        int(8).to_bytes(4, "little")
+        int(2).to_bytes(4, "little")
         + b"\x00\x01"
         + b"\x01"
         + coinbase_txin
@@ -77,7 +77,7 @@ def build_coinbase(
     )
 
     coinbase_nowit_full = (
-        int(8).to_bytes(4, "little")
+        int(2).to_bytes(4, "little")
         + b"\x01"
         + coinbase_txin
         + var_int(num_outputs)
@@ -85,7 +85,7 @@ def build_coinbase(
         + bytes(4)
     )
 
-    coinbase1 = int(8).to_bytes(4, "little") + b"\x00\x01\x01" + coinbase_txin_start
+    coinbase1 = int(2).to_bytes(4, "little") + b"\x00\x01\x01" + coinbase_txin_start
     coinbase2 = (
         coinbase_txin_end
         + var_int(num_outputs)
@@ -95,7 +95,7 @@ def build_coinbase(
         + bytes(4)
     )
 
-    coinbase1_nowit = int(8).to_bytes(4, "little") + b"\x01" + coinbase_txin_start
+    coinbase1_nowit = int(2).to_bytes(4, "little") + b"\x01" + coinbase_txin_start
     coinbase2_nowit = (
         coinbase_txin_end + var_int(num_outputs) + b"".join(outputs) + bytes(4)
     )

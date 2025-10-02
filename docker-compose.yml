@@ -30,12 +30,48 @@ services:
       retries: 5
       start_period: 60s
 
+  dogecoin:
+    build:
+      context: .
+      dockerfile: Dockerfile.dogecoin
+    container_name: dogecoin-node
+    restart: unless-stopped
+    profiles:
+      - doge
+      - full
+    ports:
+      - "${DOGE_RPC_PORT:-22555}:${DOGE_RPC_PORT:-22555}"
+      - "${DOGE_P2P_PORT:-22556}:${DOGE_P2P_PORT:-22556}"
+      - "28444:28444" # ZMQ hashblock
+      - "28445:28445" # ZMQ rawblock
+    volumes:
+      - dogecoin-data:/home/dogecoin/.dogecoin
+    environment:
+      - DOGE_RPC_USER=${DOGE_RPC_USER}
+      - DOGE_RPC_PASS=${DOGE_RPC_PASS}
+      - DOGE_RPC_PORT=${DOGE_RPC_PORT:-22555}
+      - DOGE_P2P_PORT=${DOGE_P2P_PORT:-22556}
+      - DOGE_ZMQ_PORT=${DOGE_ZMQ_PORT:-28444}
+      - DOGE_ZMQ_RAW_PORT=${DOGE_ZMQ_RAW_PORT:-28445}
+      - DOGE_PRUNE=${DOGE_PRUNE:-0}
+    networks:
+      - crypto-net
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/health-check.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   meowcoin:
     build:
       context: .
       dockerfile: Dockerfile.meowcoin
     container_name: meowcoin-node
     restart: unless-stopped
+    profiles:
+      - mewc
+      - full
     ports:
       - "${MEWC_RPC_PORT:-8766}:${MEWC_RPC_PORT:-8766}"
       - "${MEWC_P2P_PORT:-8767}:${MEWC_P2P_PORT:-8767}"
@@ -68,23 +104,26 @@ services:
     container_name: ltc-mewc-proxy
     restart: unless-stopped
     ports:
-      - "${STRATUM_PORT:-54321}:${STRATUM_PORT:-54321}"
+      - "${STRATUM_PORT:-50000}:${STRATUM_PORT:-50000}"
     depends_on:
       litecoin:
-        condition: service_healthy
-      meowcoin:
         condition: service_healthy
     environment:
       - LTC_RPC_HOST=litecoin
       - LTC_RPC_PORT=${LTC_RPC_PORT:-9332}
       - LTC_RPC_USER=${LTC_RPC_USER}
       - LTC_RPC_PASS=${LTC_RPC_PASS}
+      - DOGE_RPC_HOST=dogecoin
+      - DOGE_RPC_PORT=${DOGE_RPC_PORT:-22555}
+      - DOGE_RPC_USER=${DOGE_RPC_USER}
+      - DOGE_RPC_PASS=${DOGE_RPC_PASS}
+      - DOGE_WALLET_ADDRESS=${DOGE_WALLET_ADDRESS}
       - MEWC_RPC_HOST=meowcoin
       - MEWC_RPC_PORT=${MEWC_RPC_PORT:-8766}
       - MEWC_RPC_USER=${MEWC_RPC_USER}
       - MEWC_RPC_PASS=${MEWC_RPC_PASS}
       - MEWC_WALLET_ADDRESS=${MEWC_WALLET_ADDRESS}
-      - STRATUM_PORT=${STRATUM_PORT:-54321}
+      - STRATUM_PORT=${STRATUM_PORT:-50000}
       - TESTNET=${TESTNET:-false}
       - VERBOSE=${VERBOSE:-false}
       - SHOW_JOBS=${SHOW_JOBS:-false}
@@ -94,6 +133,7 @@ services:
       - PROXY_SIGNATURE=${PROXY_SIGNATURE:-/ltc-stratum-proxy/}
       - ENABLE_ZMQ=${ENABLE_ZMQ:-true}
       - LTC_ZMQ_ENDPOINT=${LTC_ZMQ_ENDPOINT:-tcp://litecoin:28332}
+      - DOGE_ZMQ_ENDPOINT=${DOGE_ZMQ_ENDPOINT:-tcp://dogecoin:28444}
       - MEWC_ZMQ_ENDPOINT=${MEWC_ZMQ_ENDPOINT:-tcp://meowcoin:28433}
     command: ["/app/entrypoint.sh"]
     networks:
@@ -106,7 +146,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import socket; s=socket.socket(); s.connect(('localhost', ${STRATUM_PORT:-54321})); s.close()",
+          "import socket; s=socket.socket(); s.connect(('localhost', ${STRATUM_PORT:-50000})); s.close()",
         ]
       interval: 30s
       timeout: 10s
@@ -118,6 +158,8 @@ networks:
 
 volumes:
   litecoin-data:
+    driver: local
+  dogecoin-data:
     driver: local
   meowcoin-data:
     driver: local

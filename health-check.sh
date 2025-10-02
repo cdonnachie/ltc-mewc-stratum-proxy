@@ -84,10 +84,10 @@ echo ""
 echo "🎯 Stratum Proxy:"
 
 # Check if stratum port is accessible
-if nc -z localhost 54321 2>/dev/null; then
-    echo "✅ Stratum port 54321: Accessible"
+if nc -z localhost 50000 2>/dev/null; then
+    echo "✅ Stratum port 50000: Accessible"
 else
-    echo "❌ Stratum port 54321: Not accessible"
+    echo "❌ Stratum port 50000: Not accessible"
 fi
 
 echo ""

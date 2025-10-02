@@ -11,6 +11,7 @@ async def start_server(state, settings):
         settings.verbose,
         settings.node_url,
         settings.aux_url,
+        settings.doge_url,
         settings.debug_shares,
         settings.share_difficulty_divisor,
     )

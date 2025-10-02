@@ -33,6 +33,7 @@ logs/
 
 # Docker volumes data
 litecoin-data/
+dogecoin-data/
 meowcoin-data/
 
 # IDE
@@ -57,20 +58,26 @@ Thumbs.db
 # Cryptocurrency binaries (large files, should be downloaded separately)
 binaries/litecoin/litecoind
 binaries/litecoin/litecoin-cli
+binaries/dogecoin/dogecoind
+binaries/dogecoin/dogecoin-cli
 binaries/meowcoin/meowcoind
 binaries/meowcoin/meowcoin-cli
 binaries/litecoin/*.tar.gz
+binaries/dogecoin/*.tar.gz
 binaries/meowcoin/*.tar.gz
 binaries/litecoin/*.zip
+binaries/dogecoin/*.zip
 binaries/meowcoin/*.zip
 
 # Blockchain data (if accidentally created locally)
 .litecoin/
 .meowcoin/
+.dogecoin/
 blockchain_data/
 
 # Test files
 test_*.txt
+test_build.py
 debug_*.txt
 *.test.log
 

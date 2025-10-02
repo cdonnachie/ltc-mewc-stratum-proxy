@@ -52,6 +52,11 @@ check_binary "binaries/litecoin/litecoind" "Litecoin Daemon"
 check_binary "binaries/litecoin/litecoin-cli" "Litecoin CLI"
 
 echo ""
+echo "📦 Checking Dogecoin binaries..."
+check_binary "binaries/dogecoin/dogecoind" "Dogecoin Daemon"
+check_binary "binaries/dogecoin/dogecoin-cli" "Dogecoin CLI"
+
+echo ""
 echo "📦 Checking Meowcoin binaries..."
 check_binary "binaries/meowcoin/meowcoind" "Meowcoin Daemon"
 check_binary "binaries/meowcoin/meowcoin-cli" "Meowcoin CLI"
@@ -62,6 +67,17 @@ echo "binaries/"
 echo "├── litecoin/"
 if [ -d "binaries/litecoin" ]; then
     for file in binaries/litecoin/*; do
+        if [ -f "$file" ]; then
+            echo "│   ├── $(basename "$file")"
+        fi
+    done
+else
+    echo "│   └── (directory missing)"
+fi
+
+echo "├── dogecoin/"
+if [ -d "binaries/dogecoin" ]; then
+    for file in binaries/dogecoin/*; do
         if [ -f "$file" ]; then
             echo "│   ├── $(basename "$file")"
         fi
@@ -88,6 +104,8 @@ missing_binaries=0
 required_files=(
     "binaries/litecoin/litecoind"
     "binaries/litecoin/litecoin-cli" 
+    "binaries/dogecoin/dogecoind"
+    "binaries/dogecoin/dogecoin-cli"
     "binaries/meowcoin/meowcoind"
     "binaries/meowcoin/meowcoin-cli"
 )
@@ -117,5 +135,6 @@ fi
 echo ""
 echo "💡 Help:"
 echo "  Binary requirements: See binaries/README.md"
-echo "  Litecoin setup: See binaries/litecoin/README.md" 
+echo "  Litecoin setup: See binaries/litecoin/README.md"
+echo "  Dogecoin setup: See binaries/dogecoin/README.md" 
 echo "  Meowcoin setup: See binaries/meowcoin/README.md"

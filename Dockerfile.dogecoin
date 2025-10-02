@@ -1,0 +1,40 @@
+# Dogecoin Daemon Dockerfile
+# Base: Ubuntu 24.04 LTS (Noble Numbat)
+FROM ubuntu:24.04
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    bash \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create dogecoin user and group
+RUN groupadd -r dogecoin && useradd -r -g dogecoin -m -d /home/dogecoin dogecoin
+
+# Copy the pre-built Dogecoin binaries from host
+# These should be Linux x86_64 ELF binaries
+COPY binaries/dogecoin/dogecoind /usr/local/bin/dogecoind
+COPY binaries/dogecoin/dogecoin-cli /usr/local/bin/dogecoin-cli
+
+# Make binaries executable
+RUN chmod +x /usr/local/bin/dogecoind /usr/local/bin/dogecoin-cli
+
+# Copy entrypoint and health check scripts
+COPY entrypoint-dogecoin.sh /usr/local/bin/entrypoint.sh
+COPY health-check-dogecoin.sh /usr/local/bin/health-check.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/health-check.sh
+
+# Create data directory with correct permissions
+RUN mkdir -p /home/dogecoin/.dogecoin && \
+    chown -R dogecoin:dogecoin /home/dogecoin/.dogecoin
+
+# Expose ports
+# RPC, P2P, ZMQ hashblock, ZMQ rawblock
+EXPOSE 22555 22556 28444 28445
+
+# Set working directory
+WORKDIR /home/dogecoin
+
+# Use entrypoint script to configure and start dogecoind
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
