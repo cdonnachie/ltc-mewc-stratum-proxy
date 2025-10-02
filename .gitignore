@@ -1,0 +1,80 @@
+# Environment files with sensitive data
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Logs and mining history
+*.log
+submit_history/
+logs/
+
+# Docker volumes data
+litecoin-data/
+meowcoin-data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Configuration backups
+*.conf.bak
+*.conf.old
+
+# Cryptocurrency binaries (large files, should be downloaded separately)
+binaries/litecoin/litecoind
+binaries/litecoin/litecoin-cli
+binaries/meowcoin/meowcoind
+binaries/meowcoin/meowcoin-cli
+binaries/litecoin/*.tar.gz
+binaries/meowcoin/*.tar.gz
+binaries/litecoin/*.zip
+binaries/meowcoin/*.zip
+
+# Blockchain data (if accidentally created locally)
+.litecoin/
+.meowcoin/
+blockchain_data/
+
+# Test files
+test_*.txt
+debug_*.txt
+*.test.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp

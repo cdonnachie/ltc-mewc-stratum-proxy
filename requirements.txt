@@ -1,0 +1,7 @@
+aiohttp>=3.9.5
+aiorpcx>=0.23.0
+base58>=2.1.0
+coloredlogs>=15.0.1
+scrypt>=0.8.0
+pyzmq>=25.1.0
+

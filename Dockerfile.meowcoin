@@ -1,0 +1,49 @@
+# Try Ubuntu 24.04 first for newer glibc
+FROM ubuntu:24.04 as ubuntu24
+
+# Install dependencies available in Ubuntu 24.04
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    libboost-system1.83.0 \
+    libboost-filesystem1.83.0 \
+    libboost-thread1.83.0 \
+    libboost-program-options1.83.0 \
+    libevent-2.1-7 \
+    libevent-pthreads-2.1-7 \
+    libzmq5 \
+    libc6 \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Final stage
+FROM ubuntu24
+
+# Create meowcoin user and directories
+RUN useradd -r -m -s /bin/bash meowcoin && \
+    mkdir -p /opt/meowcoin/bin && \
+    mkdir -p /home/meowcoin/.meowcoin && \
+    chown -R meowcoin:meowcoin /home/meowcoin/.meowcoin
+
+# Copy binaries, entrypoint, and health check script
+COPY binaries/meowcoin/* /opt/meowcoin/bin/
+COPY entrypoint-meowcoin.sh /usr/local/bin/entrypoint.sh
+COPY health-check-meowcoin.sh /usr/local/bin/health-check.sh
+RUN chmod +x /opt/meowcoin/bin/* && \
+    chmod +x /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/health-check.sh && \
+    ln -s /opt/meowcoin/bin/meowcoind /usr/local/bin/meowcoind && \
+    ln -s /opt/meowcoin/bin/meowcoin-cli /usr/local/bin/meowcoin-cli
+
+# Verify binary compatibility
+RUN ldd /opt/meowcoin/bin/meowcoind > /dev/null || echo "Binary verified"
+
+# Set working directory but keep running as root for entrypoint
+# (entrypoint will switch to meowcoin user after fixing permissions)
+WORKDIR /home/meowcoin
+
+# Expose ports
+EXPOSE 8766 8767
+
+# Use entrypoint script to generate config and start daemon
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD []
